@@ -1,0 +1,83 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+  background: #000000;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.wordmark {
+  position: absolute;
+  top: 1.25rem;
+  left: 1.5rem;
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+  font-weight: 400;
+  font-size: clamp(1rem, 3vw, 1.25rem);
+  letter-spacing: 0.45em;
+  color: rgba(0, 232, 90, 0.72);
+  text-shadow: 0 0 12px rgba(0, 232, 90, 0.35);
+  user-select: none;
+}
+
+.hint {
+  position: absolute;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+  font-weight: 400;
+  font-size: clamp(0.75rem, 2.5vw, 0.9rem);
+  letter-spacing: 0.25em;
+  color: rgba(0, 184, 70, 0.45);
+  text-shadow: 0 0 8px rgba(0, 232, 90, 0.2);
+  user-select: none;
+  transition: opacity 1.2s ease;
+  white-space: nowrap;
+}
+
+.hint.hidden {
+  opacity: 0;
+}
+
+.tagline {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.5rem;
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+  font-weight: 400;
+  font-size: clamp(0.65rem, 2vw, 0.8rem);
+  letter-spacing: 0.08em;
+  color: rgba(0, 140, 55, 0.38);
+  user-select: none;
+  text-align: right;
+  line-height: 1.6;
+}
+
+@media (max-width: 480px) {
+  .tagline {
+    display: none;
+  }
+}
