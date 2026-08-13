@@ -25,9 +25,16 @@ Output goes to `dist/` — deploy as a static site anywhere.
 ## How to play (30 seconds)
 
 1. **Move your pointer** (mouse or finger) — the plane follows like a breeze is guiding it. It banks when you turn and levels out when you hold still.
-2. **Click or tap** anywhere — a puff of wind gives the plane a small boost forward. Tap near the plane for an extra local shove. You'll see a green ripple where you tapped.
-3. **Press Space** or **tap the plane directly** — barrel roll! A satisfying 360° spin along the flight path. There's a short cooldown so each roll feels intentional.
-4. **Fly forever.** No timer, no obstacles, no game over. Just glide.
+2. **Click or tap** anywhere — a visible green ripple and wind streaks appear at the pointer. Every click gives a small forward boost; clicks **near the plane** add a strong local gust that visibly banks and turns it.
+3. **Keyboard (desktop):**
+   - **W** / **↑** — climb
+   - **S** / **↓** — dive
+   - **A** / **←** — bank left
+   - **D** / **→** — bank right
+   - **Space** — barrel roll (short cooldown)
+   Hold keys to steer; they combine with pointer breeze.
+4. **Tap the plane** (touch) — barrel roll, same as Space.
+5. **Fly forever.** No timer, no obstacles, no game over. Just glide.
 
 First gesture unlocks quiet ambient whoosh audio (if your browser allows it).
 

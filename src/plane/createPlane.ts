@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { PHOSPHOR, PHOSPHOR_BRIGHT, PHOSPHOR_DIM, PHOSPHOR_MID } from '../theme/colors'
+import { PHOSPHOR, PHOSPHOR_BRIGHT, PHOSPHOR_MID } from '../theme/colors'
 
 export interface PlaneBundle {
   group: THREE.Group
@@ -16,8 +16,76 @@ export interface PlaneBundle {
 const ROLL_DURATION = 0.65
 const ROLL_COOLDOWN = 1.4
 
-function addWireframeMesh(
-  parent: THREE.Group,
+/** Classic dart: nose -Z, wings swept back, center spine, small tail flaps */
+function buildDartGeometry(): THREE.BufferGeometry {
+  // Key points (one folded sheet — top + bottom halves, slight dihedral)
+  const nose = new THREE.Vector3(0, 0.04, -1.15)
+  const spineMid = new THREE.Vector3(0, 0.06, -0.05)
+  const spineTail = new THREE.Vector3(0, 0.04, 0.72)
+
+  const wingL = new THREE.Vector3(-1.75, -0.02, 0.28)
+  const wingR = new THREE.Vector3(1.75, -0.02, 0.28)
+  const wingInnerL = new THREE.Vector3(-0.1, 0.02, -0.82)
+  const wingInnerR = new THREE.Vector3(0.1, 0.02, -0.82)
+  const trailingL = new THREE.Vector3(-0.55, 0.01, 0.62)
+  const trailingR = new THREE.Vector3(0.55, 0.01, 0.62)
+
+  const tailFlapL = new THREE.Vector3(-0.32, 0.02, 0.88)
+  const tailFlapR = new THREE.Vector3(0.32, 0.02, 0.88)
+  const tailFlapTipL = new THREE.Vector3(-0.22, -0.01, 1.02)
+  const tailFlapTipR = new THREE.Vector3(0.22, -0.01, 1.02)
+
+  // Underside fold (slight V dihedral)
+  const bellyL = new THREE.Vector3(-1.72, -0.12, 0.22)
+  const bellyR = new THREE.Vector3(1.72, -0.12, 0.22)
+  const bellyNoseL = new THREE.Vector3(-0.08, -0.06, -0.78)
+  const bellyNoseR = new THREE.Vector3(0.08, -0.06, -0.78)
+
+  const verts: number[] = []
+  const pushTri = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3) => {
+    verts.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z)
+  }
+
+  // Top left wing
+  pushTri(nose, wingInnerL, wingL)
+  pushTri(wingInnerL, trailingL, wingL)
+  pushTri(wingInnerL, spineMid, trailingL)
+
+  // Top right wing
+  pushTri(nose, wingR, wingInnerR)
+  pushTri(wingInnerR, wingR, trailingR)
+  pushTri(wingInnerR, trailingR, spineMid)
+
+  // Top center spine triangle strip
+  pushTri(nose, spineMid, wingInnerL)
+  pushTri(nose, wingInnerR, spineMid)
+
+  // Bottom left wing (folded under)
+  pushTri(nose, bellyNoseL, bellyL)
+  pushTri(bellyNoseL, trailingL, bellyL)
+  pushTri(bellyNoseL, spineMid, trailingL)
+
+  // Bottom right wing
+  pushTri(nose, bellyR, bellyNoseR)
+  pushTri(bellyNoseR, bellyR, trailingR)
+  pushTri(bellyNoseR, trailingR, spineMid)
+
+  // Rear fuselage wedge
+  pushTri(spineMid, trailingL, spineTail)
+  pushTri(spineMid, spineTail, trailingR)
+
+  // Tail flaps
+  pushTri(spineTail, tailFlapL, tailFlapTipL)
+  pushTri(spineTail, tailFlapTipR, tailFlapR)
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
+  geo.computeVertexNormals()
+  return geo
+}
+
+function addFilledWireframe(
+  parent: THREE.Object3D,
   geo: THREE.BufferGeometry,
   fillColor: number,
   fillOpacity: number,
@@ -30,19 +98,28 @@ function addWireframeMesh(
     side: THREE.DoubleSide,
     depthWrite: false,
   })
-  const mesh = new THREE.Mesh(geo, fillMat)
-  parent.add(mesh)
+  parent.add(new THREE.Mesh(geo, fillMat))
 
-  const edgeGeo = new THREE.EdgesGeometry(geo, 18)
+  const edgeGeo = new THREE.EdgesGeometry(geo, 12)
   const lineMat = new THREE.LineBasicMaterial({
     color: lineColor,
     transparent: true,
-    opacity: 0.85,
+    opacity: 0.9,
   })
-  const wire = new THREE.LineSegments(edgeGeo, lineMat)
-  parent.add(wire)
+  parent.add(new THREE.LineSegments(edgeGeo, lineMat))
 
   return [fillMat, lineMat]
+}
+
+function buildSpineLine(): THREE.BufferGeometry {
+  const pts = [
+    new THREE.Vector3(0, 0.07, -1.12),
+    new THREE.Vector3(0, 0.08, -0.4),
+    new THREE.Vector3(0, 0.07, 0.1),
+    new THREE.Vector3(0, 0.05, 0.72),
+    new THREE.Vector3(0, 0.04, 0.95),
+  ]
+  return new THREE.BufferGeometry().setFromPoints(pts)
 }
 
 export function createPlane(): PlaneBundle {
@@ -53,89 +130,58 @@ export function createPlane(): PlaneBundle {
   const materials: THREE.Material[] = []
   const geos: THREE.BufferGeometry[] = []
 
-  const noseGeo = new THREE.ConeGeometry(0.08, 0.35, 4)
-  geos.push(noseGeo)
-  const nose = new THREE.Mesh(
-    noseGeo,
-    new THREE.MeshBasicMaterial({
-      color: PHOSPHOR_BRIGHT,
-      transparent: true,
-      opacity: 0.35,
-      side: THREE.DoubleSide,
-    }),
-  )
-  materials.push(nose.material as THREE.Material)
-  nose.rotation.x = Math.PI / 2
-  nose.position.z = -0.85
-  rollGroup.add(nose)
-  const noseEdges = new THREE.LineSegments(
-    new THREE.EdgesGeometry(noseGeo),
-    new THREE.LineBasicMaterial({ color: PHOSPHOR_BRIGHT, transparent: true, opacity: 0.95 }),
-  )
-  materials.push(noseEdges.material as THREE.Material)
-  rollGroup.add(noseEdges)
+  const dartGeo = buildDartGeometry()
+  geos.push(dartGeo)
+  materials.push(...addFilledWireframe(rollGroup, dartGeo, PHOSPHOR, 0.26, PHOSPHOR_BRIGHT))
 
-  const bodyShape = new THREE.Shape()
-  bodyShape.moveTo(0, 0)
-  bodyShape.lineTo(-0.12, 0.7)
-  bodyShape.lineTo(0.12, 0.7)
-  bodyShape.closePath()
-  const bodyGeo = new THREE.ExtrudeGeometry(bodyShape, { depth: 0.04, bevelEnabled: false })
-  bodyGeo.center()
-  geos.push(bodyGeo)
-  const bodyPivot = new THREE.Group()
-  bodyPivot.rotation.x = -Math.PI / 2
-  bodyPivot.position.set(0, 0, 0.1)
-  rollGroup.add(bodyPivot)
-  materials.push(...addWireframeMesh(bodyPivot, bodyGeo, PHOSPHOR_MID, 0.22, PHOSPHOR))
-
-  const wingShape = new THREE.Shape()
-  wingShape.moveTo(0, 0)
-  wingShape.lineTo(-1.6, 0.85)
-  wingShape.lineTo(-0.15, 0.05)
-  wingShape.closePath()
-  const wingGeo = new THREE.ExtrudeGeometry(wingShape, {
-    depth: 0.025,
-    bevelEnabled: true,
-    bevelThickness: 0.008,
-    bevelSize: 0.008,
+  const spineGeo = buildSpineLine()
+  geos.push(spineGeo)
+  const spineMat = new THREE.LineBasicMaterial({
+    color: PHOSPHOR_BRIGHT,
+    transparent: true,
+    opacity: 0.95,
   })
-  wingGeo.center()
-  geos.push(wingGeo)
+  materials.push(spineMat)
+  rollGroup.add(new THREE.Line(spineGeo, spineMat))
 
-  const leftPivot = new THREE.Group()
-  leftPivot.rotation.x = -Math.PI / 2
-  leftPivot.rotation.z = 0.08
-  leftPivot.position.set(-0.05, 0.02, 0.15)
-  rollGroup.add(leftPivot)
-  materials.push(...addWireframeMesh(leftPivot, wingGeo, PHOSPHOR, 0.28, PHOSPHOR_BRIGHT))
+  // Crease lines (wing fold edges)
+  const creasePts = [
+    [nose2(-1.12), wingFoldL()],
+    [nose2(-1.12), wingFoldR()],
+    [wingFoldL(), trailL()],
+    [wingFoldR(), trailR()],
+  ] as const
 
-  const rightPivot = new THREE.Group()
-  rightPivot.rotation.x = -Math.PI / 2
-  rightPivot.rotation.z = -0.08
-  rightPivot.position.set(0.05, 0.02, 0.15)
-  rightPivot.scale.x = -1
-  rollGroup.add(rightPivot)
-  const wingGeoR = wingGeo.clone()
-  geos.push(wingGeoR)
-  materials.push(...addWireframeMesh(rightPivot, wingGeoR, PHOSPHOR, 0.28, PHOSPHOR_BRIGHT))
+  function nose2(z: number) {
+    return new THREE.Vector3(0, 0.05, z)
+  }
+  function wingFoldL() {
+    return new THREE.Vector3(-0.1, 0.03, -0.8)
+  }
+  function wingFoldR() {
+    return new THREE.Vector3(0.1, 0.03, -0.8)
+  }
+  function trailL() {
+    return new THREE.Vector3(-0.55, 0.02, 0.6)
+  }
+  function trailR() {
+    return new THREE.Vector3(0.55, 0.02, 0.6)
+  }
 
-  const tailShape = new THREE.Shape()
-  tailShape.moveTo(0, 0)
-  tailShape.lineTo(-0.35, 0.45)
-  tailShape.lineTo(0, 0.08)
-  tailShape.closePath()
-  const tailGeo = new THREE.ExtrudeGeometry(tailShape, { depth: 0.02, bevelEnabled: false })
-  tailGeo.center()
-  geos.push(tailGeo)
-  const tailPivot = new THREE.Group()
-  tailPivot.rotation.x = -Math.PI / 2
-  tailPivot.position.set(0, 0.015, 0.75)
-  rollGroup.add(tailPivot)
-  materials.push(...addWireframeMesh(tailPivot, tailGeo, PHOSPHOR_DIM, 0.18, PHOSPHOR_MID))
+  const creaseMat = new THREE.LineBasicMaterial({
+    color: PHOSPHOR_MID,
+    transparent: true,
+    opacity: 0.7,
+  })
+  materials.push(creaseMat)
+  for (const [a, b] of creasePts) {
+    const g = new THREE.BufferGeometry().setFromPoints([a, b])
+    geos.push(g)
+    rollGroup.add(new THREE.Line(g, creaseMat))
+  }
 
-  const leftTip = new THREE.Vector3(-1.55, 0.02, 0.5)
-  const rightTip = new THREE.Vector3(1.55, 0.02, 0.5)
+  const leftTip = new THREE.Vector3(-1.75, -0.02, 0.28)
+  const rightTip = new THREE.Vector3(1.75, -0.02, 0.28)
 
   let rollAngle = 0
   let rollProgress = 1

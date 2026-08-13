@@ -1,5 +1,4 @@
 import * as THREE from 'three'
-import { PHOSPHOR_BRIGHT, PHOSPHOR_MID } from '../theme/colors'
 
 export interface PointerState {
   x: number
@@ -9,23 +8,41 @@ export interface PointerState {
   isMoving: boolean
 }
 
+export interface KeyboardSteer {
+  /** -1 = left, +1 = right */
+  x: number
+  /** +1 = climb, -1 = dive */
+  y: number
+  active: boolean
+}
+
 export interface PuffEvent {
   screenX: number
   screenY: number
   worldPoint: THREE.Vector3
   nearPlane: boolean
+  gustDirection: THREE.Vector3
+  distance: number
 }
 
 export interface InputState {
   pointer: PointerState
+  keyboard: KeyboardSteer
   update: (dt: number) => void
   consumePuffs: () => PuffEvent[]
   consumeRoll: () => boolean
   consumeFirstGesture: () => boolean
+  dispose: () => void
 }
 
 const STILL_THRESHOLD = 0.008
-const NEAR_PLANE_RADIUS = 3.5
+/** World-space radius for strong local gust */
+export const NEAR_PLANE_RADIUS = 9
+
+const STEER_KEYS = new Set([
+  'KeyW', 'KeyA', 'KeyS', 'KeyD',
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+])
 
 export function createInputManager(
   domElement: HTMLElement,
@@ -39,24 +56,27 @@ export function createInputManager(
   let prevNormX = 0
   let prevNormY = 0
   let isMoving = false
-  let moveSpeed = 0
 
   const puffs: PuffEvent[] = []
   let rollRequested = false
   let planeClicked = false
   let firstGesture = false
   let hasGestured = false
+  const keysDown = new Set<string>()
 
   const raycaster = new THREE.Raycaster()
-  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
   const intersect = new THREE.Vector3()
+  const gustDir = new THREE.Vector3()
 
-  function screenToWorld(sx: number, sy: number): THREE.Vector3 {
+  function screenToWorld(sx: number, sy: number, planeY: number): THREE.Vector3 {
     const rect = domElement.getBoundingClientRect()
     const x = ((sx - rect.left) / rect.width) * 2 - 1
     const y = -((sy - rect.top) / rect.height) * 2 + 1
     raycaster.setFromCamera(new THREE.Vector2(x, y), camera)
-    raycaster.ray.intersectPlane(groundPlane, intersect)
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY)
+    if (!raycaster.ray.intersectPlane(plane, intersect)) {
+      intersect.set(0, planeY, 0)
+    }
     return intersect.clone()
   }
 
@@ -77,14 +97,22 @@ export function createInputManager(
 
   function addPuff(clientX: number, clientY: number) {
     markGesture()
-    const world = screenToWorld(clientX, clientY)
     const planePos = getPlanePosition()
+    const world = screenToWorld(clientX, clientY, planePos.y)
     const dist = world.distanceTo(planePos)
+    // Gust blows FROM click TOWARD the plane
+    gustDir.copy(planePos).sub(world)
+    gustDir.y *= 0.65
+    if (gustDir.lengthSq() < 0.01) gustDir.set(0, 0, -1)
+    gustDir.normalize()
+
     puffs.push({
       screenX: clientX,
       screenY: clientY,
       worldPoint: world,
       nearPlane: dist < NEAR_PLANE_RADIUS,
+      gustDirection: gustDir.clone(),
+      distance: dist,
     })
   }
 
@@ -98,10 +126,10 @@ export function createInputManager(
     updatePointer(e.clientX, e.clientY)
 
     const planePos = getPlanePosition()
-    const world = screenToWorld(e.clientX, e.clientY)
+    const world = screenToWorld(e.clientX, e.clientY, planePos.y)
     const dist = world.distanceTo(planePos)
 
-    if (dist < 1.8) {
+    if (dist < 1.5) {
       planeClicked = true
       markGesture()
       return
@@ -115,27 +143,53 @@ export function createInputManager(
       e.preventDefault()
       rollRequested = true
       markGesture()
+      return
+    }
+    if (STEER_KEYS.has(e.code)) {
+      e.preventDefault()
+      keysDown.add(e.code)
+      markGesture()
     }
   }
+
+  const onKeyUp = (e: KeyboardEvent) => {
+    keysDown.delete(e.code)
+  }
+
+  const onBlur = () => keysDown.clear()
 
   domElement.addEventListener('pointermove', onPointerMove)
   domElement.addEventListener('pointerdown', onPointerDown)
   window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('keyup', onKeyUp)
+  window.addEventListener('blur', onBlur)
+
+  function readKeyboard(): KeyboardSteer {
+    let x = 0
+    let y = 0
+    if (keysDown.has('KeyA') || keysDown.has('ArrowLeft')) x -= 1
+    if (keysDown.has('KeyD') || keysDown.has('ArrowRight')) x += 1
+    if (keysDown.has('KeyW') || keysDown.has('ArrowUp')) y += 1
+    if (keysDown.has('KeyS') || keysDown.has('ArrowDown')) y -= 1
+    const len = Math.hypot(x, y)
+    if (len > 1) {
+      x /= len
+      y /= len
+    }
+    return { x, y, active: len > 0 }
+  }
 
   return {
     get pointer() {
-      return {
-        x: pointerX,
-        y: pointerY,
-        normalizedX: normX,
-        normalizedY: normY,
-        isMoving,
-      }
+      return { x: pointerX, y: pointerY, normalizedX: normX, normalizedY: normY, isMoving }
+    },
+    get keyboard() {
+      return readKeyboard()
     },
     update(dt: number) {
       const dx = normX - prevNormX
       const dy = normY - prevNormY
-      moveSpeed = Math.sqrt(dx * dx + dy * dy) / Math.max(dt, 0.001)
+      const moveSpeed = Math.sqrt(dx * dx + dy * dy) / Math.max(dt, 0.001)
       isMoving = moveSpeed > STILL_THRESHOLD * 60
       prevNormX = normX
       prevNormY = normY
@@ -156,49 +210,12 @@ export function createInputManager(
       firstGesture = false
       return true
     },
+    dispose() {
+      domElement.removeEventListener('pointermove', onPointerMove)
+      domElement.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
+    },
   }
-}
-
-export interface Ripple {
-  mesh: THREE.Mesh
-  age: number
-  maxAge: number
-}
-
-export function createRipple(scene: THREE.Scene, point: THREE.Vector3): Ripple {
-  const geo = new THREE.RingGeometry(0.1, 0.15, 32)
-  const mat = new THREE.MeshBasicMaterial({
-    color: PHOSPHOR_BRIGHT,
-    transparent: true,
-    opacity: 0.6,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  })
-  const mesh = new THREE.Mesh(geo, mat)
-  mesh.rotation.x = -Math.PI / 2
-  mesh.position.copy(point)
-  mesh.position.y = point.y > 0 ? point.y - 0.05 : -1.95
-  scene.add(mesh)
-  return { mesh, age: 0, maxAge: 0.9 }
-}
-
-export function updateRipples(ripples: Ripple[], dt: number): Ripple[] {
-  const alive: Ripple[] = []
-  for (const r of ripples) {
-    r.age += dt
-    const t = r.age / r.maxAge
-    const scale = 1 + t * 6
-    r.mesh.scale.set(scale, scale, scale)
-    const mat = r.mesh.material as THREE.MeshBasicMaterial
-    mat.opacity = 0.6 * (1 - t)
-    mat.color.setHex(t < 0.5 ? PHOSPHOR_BRIGHT : PHOSPHOR_MID)
-    if (r.age < r.maxAge) {
-      alive.push(r)
-    } else {
-      r.mesh.geometry.dispose()
-      mat.dispose()
-      r.mesh.parent?.remove(r.mesh)
-    }
-  }
-  return alive
 }

@@ -4,12 +4,8 @@ import { createEnvironment, wrapWorldPosition } from './scene/environment'
 import { createBreezeMark, pointerToBreezeTarget } from './scene/breezeMark'
 import { createPlane, getWorldWingtips } from './plane/createPlane'
 import { WingtipTrails } from './plane/trails'
-import {
-  createInputManager,
-  createRipple,
-  updateRipples,
-  type Ripple,
-} from './input/InputManager'
+import { createInputManager } from './input/InputManager'
+import { createPuffVisual, updatePuffVisuals, type PuffVisual } from './input/puffVisuals'
 import { Simulation } from './sim/Simulation'
 import { unlockAudio, playPuff, playRoll, playWhoosh } from './audio/whoosh'
 
@@ -31,7 +27,7 @@ export default function App() {
     const trails = new WingtipTrails(scene)
     const input = createInputManager(renderer.domElement, camera, () => sim.position)
 
-    const ripples: Ripple[] = []
+    const puffVisuals: PuffVisual[] = []
     let lastTime = performance.now()
     let animId = 0
 
@@ -49,10 +45,10 @@ export default function App() {
       }
 
       const puffs = input.consumePuffs()
-      sim.update(dt, input.pointer, camera, puffs)
+      sim.update(dt, input.pointer, input.keyboard, camera, puffs)
 
       for (const puff of puffs) {
-        ripples.push(createRipple(scene, puff.worldPoint))
+        puffVisuals.push(createPuffVisual(scene, puff.worldPoint, puff.nearPlane))
         playPuff()
       }
 
@@ -77,7 +73,7 @@ export default function App() {
         camera,
         sim.position.y,
       )
-      breezeMark.update(breezeTarget, input.pointer.isMoving, dt)
+      breezeMark.update(breezeTarget, input.pointer.isMoving || input.keyboard.active, dt)
 
       const [leftTip, rightTip] = getWorldWingtips(plane.group, plane.leftTip, plane.rightTip)
       trails.update(leftTip, rightTip)
@@ -85,9 +81,9 @@ export default function App() {
       updateCameraFollow(camera, sim.position, sim.quaternion, dt)
       env.updateParticles(dt)
 
-      const alive = updateRipples(ripples, dt)
-      ripples.length = 0
-      ripples.push(...alive)
+      const alivePuffs = updatePuffVisuals(puffVisuals, dt)
+      puffVisuals.length = 0
+      puffVisuals.push(...alivePuffs)
 
       renderer.render(scene, camera)
     }
@@ -100,6 +96,7 @@ export default function App() {
       breezeMark.dispose()
       plane.dispose()
       env.dispose()
+      input.dispose()
       disposeScene()
     }
   }, [])
