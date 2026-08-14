@@ -24,19 +24,23 @@ Output goes to `dist/` — deploy as a static site anywhere.
 
 ## How to play (30 seconds)
 
-1. **Move your pointer** (mouse or finger) — the plane follows like a breeze is guiding it. It banks when you turn and levels out when you hold still.
-2. **Click or tap** anywhere — a visible green ripple and wind streaks appear at the pointer. Every click gives a small forward boost; clicks **near the plane** add a strong local gust that visibly banks and turns it.
-3. **Keyboard (desktop):**
+1. **Glide forever** — the plane drifts on ambient wind even with no input. You’re always traveling through the void.
+2. **Move your pointer** (mouse or finger) — the plane follows like a breeze is guiding it. It banks when you turn and levels when you hold still.
+3. **Click or tap** — drops an expanding breeze **wave**: a green reticle + thin ring that grows outward (~1–2s). The plane keeps its path until the wave front reaches it, then lurches **away from the click** (radial shove). Nearby clicks hit fast and hard; far clicks take longer and push weaker. Wind streaks on the ring help it read as breeze.
+4. **Keyboard (desktop):**
    - **W** / **↑** — climb
    - **S** / **↓** — dive
    - **A** / **←** — bank left
    - **D** / **→** — bank right
    - **Space** — barrel roll (short cooldown)
    Hold keys to steer; they combine with pointer breeze.
-4. **Tap the plane** (touch) — barrel roll, same as Space.
-5. **Fly forever.** No timer, no obstacles, no game over. Just glide.
+5. **Tap the plane** (touch) — barrel roll, same as Space.
 
-First gesture unlocks quiet ambient whoosh audio (if your browser allows it).
+First gesture unlocks a quiet whoosh bed plus soft sounds on wave hits, turns, and rolls. No music, no harsh beeps.
+
+## Feel
+
+Like being a paper plane traveling in the wind — enough breeze to keep moving forever, with clicks as ripples that perturb your glide.
 
 ## v1.1 ideas
 

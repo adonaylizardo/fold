@@ -5,9 +5,14 @@ import { createBreezeMark, pointerToBreezeTarget } from './scene/breezeMark'
 import { createPlane, getWorldWingtips } from './plane/createPlane'
 import { WingtipTrails } from './plane/trails'
 import { createInputManager } from './input/InputManager'
-import { createPuffVisual, updatePuffVisuals, type PuffVisual } from './input/puffVisuals'
+import { createWaveVisual, updateWaveVisuals, disposeAllWaveVisuals, type WaveVisual } from './input/waveVisuals'
+import {
+  createBreezeWave,
+  updateBreezeWaves,
+  type BreezeWave,
+} from './sim/BreezeWave'
 import { Simulation } from './sim/Simulation'
-import { unlockAudio, playPuff, playRoll, playWhoosh } from './audio/whoosh'
+import { unlockAudio, playRoll, playWaveHit, updateTurnAudio } from './audio/whoosh'
 
 export default function App() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -27,7 +32,8 @@ export default function App() {
     const trails = new WingtipTrails(scene)
     const input = createInputManager(renderer.domElement, camera, () => sim.position)
 
-    const puffVisuals: PuffVisual[] = []
+    const breezeWaves: BreezeWave[] = []
+    const waveVisuals: WaveVisual[] = []
     let lastTime = performance.now()
     let animId = 0
 
@@ -41,16 +47,24 @@ export default function App() {
 
       if (input.consumeFirstGesture()) {
         unlockAudio()
-        playWhoosh(0.15)
       }
 
-      const puffs = input.consumePuffs()
-      sim.update(dt, input.pointer, input.keyboard, camera, puffs)
-
-      for (const puff of puffs) {
-        puffVisuals.push(createPuffVisual(scene, puff.worldPoint, puff.nearPlane))
-        playPuff()
+      for (const spawn of input.consumeWaveSpawns()) {
+        const wave = createBreezeWave(spawn, sim.position)
+        breezeWaves.push(wave)
+        waveVisuals.push(createWaveVisual(scene, wave))
       }
+
+      const { waves: aliveWaves, hits } = updateBreezeWaves(breezeWaves, sim.position, dt)
+      breezeWaves.length = 0
+      breezeWaves.push(...aliveWaves)
+
+      for (const hit of hits) {
+        playWaveHit(hit.strength)
+      }
+
+      sim.update(dt, input.pointer, input.keyboard, camera, hits)
+      updateTurnAudio(sim.bankAngle, dt)
 
       if (input.consumeRoll()) {
         if (plane.startRoll()) {
@@ -79,11 +93,11 @@ export default function App() {
       trails.update(leftTip, rightTip)
 
       updateCameraFollow(camera, sim.position, sim.quaternion, dt)
-      env.updateParticles(dt)
+      env.update(dt, sim.position, sim.velocity)
 
-      const alivePuffs = updatePuffVisuals(puffVisuals, dt)
-      puffVisuals.length = 0
-      puffVisuals.push(...alivePuffs)
+      const aliveVis = updateWaveVisuals(waveVisuals, breezeWaves, dt)
+      waveVisuals.length = 0
+      waveVisuals.push(...aliveVis)
 
       renderer.render(scene, camera)
     }
@@ -94,6 +108,7 @@ export default function App() {
       cancelAnimationFrame(animId)
       trails.dispose()
       breezeMark.dispose()
+      disposeAllWaveVisuals(waveVisuals)
       plane.dispose()
       env.dispose()
       input.dispose()

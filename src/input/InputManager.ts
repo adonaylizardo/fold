@@ -9,19 +9,13 @@ export interface PointerState {
 }
 
 export interface KeyboardSteer {
-  /** -1 = left, +1 = right */
   x: number
-  /** +1 = climb, -1 = dive */
   y: number
   active: boolean
 }
 
-export interface PuffEvent {
-  screenX: number
-  screenY: number
-  worldPoint: THREE.Vector3
-  nearPlane: boolean
-  gustDirection: THREE.Vector3
+export interface WaveSpawn {
+  origin: THREE.Vector3
   distance: number
 }
 
@@ -29,15 +23,13 @@ export interface InputState {
   pointer: PointerState
   keyboard: KeyboardSteer
   update: (dt: number) => void
-  consumePuffs: () => PuffEvent[]
+  consumeWaveSpawns: () => WaveSpawn[]
   consumeRoll: () => boolean
   consumeFirstGesture: () => boolean
   dispose: () => void
 }
 
 const STILL_THRESHOLD = 0.008
-/** World-space radius for strong local gust */
-export const NEAR_PLANE_RADIUS = 9
 
 const STEER_KEYS = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD',
@@ -57,7 +49,7 @@ export function createInputManager(
   let prevNormY = 0
   let isMoving = false
 
-  const puffs: PuffEvent[] = []
+  const waveSpawns: WaveSpawn[] = []
   let rollRequested = false
   let planeClicked = false
   let firstGesture = false
@@ -66,7 +58,6 @@ export function createInputManager(
 
   const raycaster = new THREE.Raycaster()
   const intersect = new THREE.Vector3()
-  const gustDir = new THREE.Vector3()
 
   function screenToWorld(sx: number, sy: number, planeY: number): THREE.Vector3 {
     const rect = domElement.getBoundingClientRect()
@@ -95,25 +86,12 @@ export function createInputManager(
     }
   }
 
-  function addPuff(clientX: number, clientY: number) {
+  function addWave(clientX: number, clientY: number) {
     markGesture()
     const planePos = getPlanePosition()
     const world = screenToWorld(clientX, clientY, planePos.y)
     const dist = world.distanceTo(planePos)
-    // Gust blows FROM click TOWARD the plane
-    gustDir.copy(planePos).sub(world)
-    gustDir.y *= 0.65
-    if (gustDir.lengthSq() < 0.01) gustDir.set(0, 0, -1)
-    gustDir.normalize()
-
-    puffs.push({
-      screenX: clientX,
-      screenY: clientY,
-      worldPoint: world,
-      nearPlane: dist < NEAR_PLANE_RADIUS,
-      gustDirection: gustDir.clone(),
-      distance: dist,
-    })
+    waveSpawns.push({ origin: world, distance: dist })
   }
 
   const onPointerMove = (e: PointerEvent) => {
@@ -135,7 +113,7 @@ export function createInputManager(
       return
     }
 
-    addPuff(e.clientX, e.clientY)
+    addWave(e.clientX, e.clientY)
   }
 
   const onKeyDown = (e: KeyboardEvent) => {
@@ -194,9 +172,9 @@ export function createInputManager(
       prevNormX = normX
       prevNormY = normY
     },
-    consumePuffs() {
-      const out = [...puffs]
-      puffs.length = 0
+    consumeWaveSpawns() {
+      const out = [...waveSpawns]
+      waveSpawns.length = 0
       return out
     },
     consumeRoll() {

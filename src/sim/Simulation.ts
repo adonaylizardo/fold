@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import type { KeyboardSteer, PuffEvent } from '../input/InputManager'
-import { NEAR_PLANE_RADIUS } from '../input/InputManager'
+import type { KeyboardSteer } from '../input/InputManager'
+import type { WaveHit } from './BreezeWave'
 
 export interface SimState {
   position: THREE.Vector3
@@ -10,12 +10,10 @@ export interface SimState {
   pitchAngle: number
 }
 
-const BASE_SPEED = 6
-const CHASE_STRENGTH = 2.8
+const BASE_SPEED = 6.2
+const CHASE_STRENGTH = 2.6
 const BANK_FACTOR = 0.55
-const LEVEL_SPEED = 4
-const PUFF_BOOST = 3.5
-const NEAR_GUST = 22
+const LEVEL_SPEED = 3.5
 const MIN_Y = 0.8
 const MAX_Y = 14
 const KEY_OFFSET = 14
@@ -27,10 +25,11 @@ export class Simulation {
   quaternion = new THREE.Quaternion()
   bankAngle = 0
   pitchAngle = 0
+  gustBank = 0
+  ambientTime = 0
 
   private targetDir = new THREE.Vector3(0, 0, -1)
   private smoothPointer = new THREE.Vector2(0, 0)
-  private gustBank = 0
   private readonly _forward = new THREE.Vector3()
   private readonly _lookMat = new THREE.Matrix4()
   private readonly _targetQuat = new THREE.Quaternion()
@@ -40,6 +39,7 @@ export class Simulation {
   private readonly _breezeTarget = new THREE.Vector3()
   private readonly _toTarget = new THREE.Vector3()
   private readonly _desiredVel = new THREE.Vector3()
+  private readonly _ambientDir = new THREE.Vector3()
   private readonly _raycaster = new THREE.Raycaster()
   private readonly _ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
   private readonly _hit = new THREE.Vector3()
@@ -54,8 +54,10 @@ export class Simulation {
     pointer: { normalizedX: number; normalizedY: number; isMoving: boolean },
     keyboard: KeyboardSteer,
     camera: THREE.PerspectiveCamera,
-    puffs: PuffEvent[],
+    waveHits: WaveHit[],
   ) {
+    this.ambientTime += dt
+
     this.smoothPointer.x += (pointer.normalizedX - this.smoothPointer.x) * Math.min(1, dt * 6)
     this.smoothPointer.y += (pointer.normalizedY - this.smoothPointer.y) * Math.min(1, dt * 6)
 
@@ -76,26 +78,37 @@ export class Simulation {
       breezeTarget.add(this._keyWorld)
     }
 
+    // Ambient glide — perpetual drifting wind even with no input
+    const t = this.ambientTime
+    this._ambientDir.set(
+      Math.sin(t * 0.31) * 0.55 + Math.sin(t * 0.13) * 0.35,
+      Math.sin(t * 0.23) * 0.12 + Math.sin(t * 0.41) * 0.06,
+      Math.cos(t * 0.27) * 0.45 + Math.sin(t * 0.19) * 0.3,
+    )
+    breezeTarget.add(this._ambientDir)
+
     this._toTarget.copy(breezeTarget).sub(this.position)
 
     const chasing = pointer.isMoving || keyboard.active
     if (chasing) {
       this.targetDir.lerp(this._toTarget.normalize(), Math.min(1, dt * CHASE_STRENGTH))
     } else {
-      this._flatVel.set(this.velocity.x, 0, this.velocity.z)
-      if (this._flatVel.lengthSq() > 0.001) {
-        this.targetDir.lerp(this._flatVel.normalize(), Math.min(1, dt * LEVEL_SPEED * 0.3))
-      }
+      // Even idle: gentle ambient steering keeps the plane alive in the wind
+      this.targetDir.lerp(this._toTarget.normalize(), Math.min(1, dt * 0.85))
     }
 
     this._desiredVel.copy(this.targetDir).normalize().multiplyScalar(BASE_SPEED)
-    this.velocity.lerp(this._desiredVel, Math.min(1, dt * 2.5))
+    this.velocity.lerp(this._desiredVel, Math.min(1, dt * 2.2))
 
-    for (const puff of puffs) {
-      this.applyPuff(puff)
+    for (const hit of waveHits) {
+      this.applyWaveHit(hit)
     }
 
     this.gustBank *= Math.pow(0.02, dt)
+
+    // Gentle vertical bob from ambient wind
+    this.velocity.y += Math.sin(t * 0.37) * 0.08 * dt
+    this.velocity.y += Math.cos(t * 0.53) * 0.05 * dt
 
     this.position.addScaledVector(this.velocity, dt)
     this.position.y = THREE.MathUtils.clamp(this.position.y, MIN_Y, MAX_Y)
@@ -111,12 +124,15 @@ export class Simulation {
         ? (pointer.normalizedX - this.smoothPointer.x) * 8
         : 0
       const keyBank = keyboard.active ? -keyboard.x * 0.45 : 0
-      const targetBank = (pointer.isMoving ? -turnRate * BANK_FACTOR : 0) + keyBank + this.gustBank
+      const ambientBank = Math.sin(t * 0.29) * 0.12
+      const targetBank =
+        (pointer.isMoving ? -turnRate * BANK_FACTOR : ambientBank) + keyBank + this.gustBank
       this.bankAngle += (targetBank - this.bankAngle) * Math.min(1, dt * LEVEL_SPEED)
 
       const velPitch = THREE.MathUtils.clamp(this.velocity.y * 0.08, -0.35, 0.35)
       const keyPitch = keyboard.active ? keyboard.y * 0.18 : 0
-      this.pitchAngle += (velPitch + keyPitch - this.pitchAngle) * Math.min(1, dt * 3)
+      const ambientPitch = Math.sin(t * 0.33) * 0.06
+      this.pitchAngle += (velPitch + keyPitch + ambientPitch - this.pitchAngle) * Math.min(1, dt * 3)
 
       this.baseQuat.slerp(this._targetQuat, Math.min(1, dt * 4))
 
@@ -134,29 +150,18 @@ export class Simulation {
     return this._breezeTarget
   }
 
-  private applyPuff(puff: PuffEvent) {
-    this._forward.copy(this.velocity)
-    if (this._forward.lengthSq() < 0.01) this._forward.set(0, 0, -1)
-    this._forward.normalize()
+  private applyWaveHit(hit: WaveHit) {
+    const push = hit.pushDirection
+    const strength = hit.strength
 
-    // Always: nose boost
-    this.velocity.addScaledVector(this._forward, PUFF_BOOST)
+    this.velocity.addScaledVector(push, strength)
+    this.targetDir.lerp(push, 0.35 + (strength / 20) * 0.35)
+    this.gustBank += push.x * (strength / 20) * 1.6
 
-    if (puff.nearPlane) {
-      const falloff = 1 - puff.distance / NEAR_PLANE_RADIUS
-      const strength = NEAR_GUST * (0.45 + falloff * 0.55)
-
-      // Gust from click toward plane — pushes and turns
-      this.velocity.addScaledVector(puff.gustDirection, strength)
-
-      // Redirect target direction sharply so the turn is obvious
-      this.targetDir.lerp(puff.gustDirection, 0.55 + falloff * 0.35)
-
-      // Extra vertical shove for clicks above/below
-      this.velocity.y += puff.gustDirection.y * strength * 0.35
-
-      // Temporary bank kick from lateral gust
-      this.gustBank += puff.gustDirection.x * falloff * 1.4
+    this._forward.set(this.velocity.x, 0, this.velocity.z)
+    if (this._forward.lengthSq() > 0.01) {
+      this._forward.normalize()
+      this.velocity.addScaledVector(this._forward, 1.2)
     }
   }
 }
