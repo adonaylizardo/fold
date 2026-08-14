@@ -1,7 +1,9 @@
 import * as THREE from 'three'
 import { phosphorRgb } from '../theme/colors'
 
-const MAX_POINTS = 72
+/** ~many seconds of ribbon at 60fps — never a vanishing wisp */
+const MAX_POINTS = 1800
+const MIN_BRIGHTNESS = 0.42
 
 export class WingtipTrails {
   private leftPoints: THREE.Vector3[] = []
@@ -10,21 +12,41 @@ export class WingtipTrails {
   private rightLine: THREE.Line
   private leftGeo: THREE.BufferGeometry
   private rightGeo: THREE.BufferGeometry
-  private tick = 0
+  private leftPosAttr: THREE.BufferAttribute
+  private rightPosAttr: THREE.BufferAttribute
+  private leftColAttr: THREE.BufferAttribute
+  private rightColAttr: THREE.BufferAttribute
 
   constructor(scene: THREE.Scene) {
     this.leftGeo = new THREE.BufferGeometry()
     this.rightGeo = new THREE.BufferGeometry()
 
+    const posL = new Float32Array(MAX_POINTS * 3)
+    const posR = new Float32Array(MAX_POINTS * 3)
+    const colL = new Float32Array(MAX_POINTS * 3)
+    const colR = new Float32Array(MAX_POINTS * 3)
+
+    this.leftPosAttr = new THREE.BufferAttribute(posL, 3)
+    this.rightPosAttr = new THREE.BufferAttribute(posR, 3)
+    this.leftColAttr = new THREE.BufferAttribute(colL, 3)
+    this.rightColAttr = new THREE.BufferAttribute(colR, 3)
+
+    this.leftGeo.setAttribute('position', this.leftPosAttr)
+    this.leftGeo.setAttribute('color', this.leftColAttr)
+    this.rightGeo.setAttribute('position', this.rightPosAttr)
+    this.rightGeo.setAttribute('color', this.rightColAttr)
+    this.leftGeo.setDrawRange(0, 0)
+    this.rightGeo.setDrawRange(0, 0)
+
     const matLeft = new THREE.LineBasicMaterial({
       vertexColors: true,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.88,
     })
     const matRight = new THREE.LineBasicMaterial({
       vertexColors: true,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.88,
     })
 
     this.leftLine = new THREE.Line(this.leftGeo, matLeft)
@@ -34,34 +56,44 @@ export class WingtipTrails {
   }
 
   update(leftTip: THREE.Vector3, rightTip: THREE.Vector3) {
-    this.tick++
-    if (this.tick % 2 !== 0) return
-
     this.leftPoints.unshift(leftTip.clone())
     this.rightPoints.unshift(rightTip.clone())
-    if (this.leftPoints.length > MAX_POINTS) this.leftPoints.pop()
-    if (this.rightPoints.length > MAX_POINTS) this.rightPoints.pop()
+    if (this.leftPoints.length > MAX_POINTS) this.leftPoints.length = MAX_POINTS
+    if (this.rightPoints.length > MAX_POINTS) this.rightPoints.length = MAX_POINTS
 
-    this.refreshGeo(this.leftGeo, this.leftPoints)
-    this.refreshGeo(this.rightGeo, this.rightPoints)
+    this.refreshGeo(this.leftGeo, this.leftPoints, this.leftPosAttr, this.leftColAttr)
+    this.refreshGeo(this.rightGeo, this.rightPoints, this.rightPosAttr, this.rightColAttr)
   }
 
-  private refreshGeo(geo: THREE.BufferGeometry, pts: THREE.Vector3[]) {
+  shift(offset: THREE.Vector3) {
+    for (const p of this.leftPoints) p.add(offset)
+    for (const p of this.rightPoints) p.add(offset)
+  }
+
+  private refreshGeo(
+    geo: THREE.BufferGeometry,
+    pts: THREE.Vector3[],
+    posAttr: THREE.BufferAttribute,
+    colAttr: THREE.BufferAttribute,
+  ) {
     if (pts.length < 2) return
-    const positions = new Float32Array(pts.length * 3)
-    const colors = new Float32Array(pts.length * 3)
-    for (let i = 0; i < pts.length; i++) {
-      positions[i * 3] = pts[i].x
-      positions[i * 3 + 1] = pts[i].y
-      positions[i * 3 + 2] = pts[i].z
-      const t = 1 - i / pts.length
+    const n = pts.length
+    const pos = posAttr.array as Float32Array
+    const col = colAttr.array as Float32Array
+    for (let i = 0; i < n; i++) {
+      pos[i * 3] = pts[i].x
+      pos[i * 3 + 1] = pts[i].y
+      pos[i * 3 + 2] = pts[i].z
+      const age = i / Math.max(n - 1, 1)
+      const t = MIN_BRIGHTNESS + (1 - age) * (1 - MIN_BRIGHTNESS)
       const [r, g, b] = phosphorRgb(t)
-      colors[i * 3] = r
-      colors[i * 3 + 1] = g
-      colors[i * 3 + 2] = b
+      col[i * 3] = r
+      col[i * 3 + 1] = g
+      col[i * 3 + 2] = b
     }
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    posAttr.needsUpdate = true
+    colAttr.needsUpdate = true
+    geo.setDrawRange(0, n)
   }
 
   dispose() {

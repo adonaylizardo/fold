@@ -78,7 +78,8 @@ export default function App() {
       plane.updateRoll(dt)
       plane.group.updateMatrixWorld(true)
 
-      wrapWorldPosition(sim.position)
+      const wrapDelta = wrapWorldPosition(sim.position)
+      if (wrapDelta) trails.shift(wrapDelta)
       plane.group.position.copy(sim.position)
 
       const breezeTarget = pointerToBreezeTarget(
@@ -122,19 +123,29 @@ export default function App() {
   }, [])
 
   return (
-    <>
-      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-      <div className="overlay">
-        <div className="wordmark">FOLD</div>
-        <div className="tagline">
-          A paper plane.
-          <br />
-          A breeze.
-          <br />
-          A page.
+    <div className="terminal-shell">
+      <header className="terminal-top">
+        <div className="terminal-brand">FOLD</div>
+        <div className="terminal-status">
+          <span>GLIDE</span>
+          <span>VOID</span>
+          <span>● ON</span>
         </div>
-        <div className={`hint ${hintVisible ? '' : 'hidden'}`}>SPACE TO ROLL</div>
+      </header>
+
+      <div className="terminal-screen-wrap">
+        <div className="terminal-screen" ref={containerRef} />
       </div>
-    </>
+
+      <footer className="terminal-bottom">
+        <div className={`terminal-hint ${hintVisible ? '' : 'hidden'}`}>SPACE TO ROLL</div>
+        <div className="terminal-ticks">
+          <span className="screw" />
+          <span className="tick-mark" />
+          <span className="tick-mark" />
+          <span className="screw" />
+        </div>
+      </footer>
+    </div>
   )
 }

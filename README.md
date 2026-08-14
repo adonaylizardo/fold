@@ -38,6 +38,12 @@ Output goes to `dist/` — deploy as a static site anywhere.
 
 First gesture unlocks a quiet whoosh bed plus soft sounds on wave hits, turns, and rolls. No music, no harsh beeps.
 
+## Look
+
+- **Retro terminal frame** — the 3D view sits inside a phosphor-green CRT/console bezel with scanlines and quiet status ticks.
+- **Persistent flight ribbons** — dual green wingtip trails stay visible as a long trajectory behind you (they don’t wipe away).
+- **Living void** — dense twinkling starfield, passing wireframe planets, streaming vector dust.
+
 ## Feel
 
 Like being a paper plane traveling in the wind — enough breeze to keep moving forever, with clicks as ripples that perturb your glide.
