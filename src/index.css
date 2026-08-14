@@ -1,0 +1,188 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+  background: #030303;
+}
+
+/* ── Retro terminal shell ── */
+.terminal-shell {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(145deg, #141414 0%, #0a0a0a 40%, #050505 100%);
+  padding: clamp(10px, 2vw, 18px);
+  gap: clamp(6px, 1.2vw, 10px);
+}
+
+.terminal-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(4px, 1vw, 8px);
+  flex-shrink: 0;
+}
+
+.terminal-brand {
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+  font-size: clamp(0.85rem, 2.2vw, 1.05rem);
+  letter-spacing: 0.42em;
+  color: rgba(0, 232, 90, 0.78);
+  text-shadow: 0 0 10px rgba(0, 232, 90, 0.35);
+  user-select: none;
+}
+
+.terminal-status {
+  display: flex;
+  gap: clamp(10px, 2vw, 18px);
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+  font-size: clamp(0.55rem, 1.5vw, 0.68rem);
+  letter-spacing: 0.12em;
+  color: rgba(0, 160, 62, 0.42);
+  user-select: none;
+}
+
+.terminal-status span::before {
+  content: '▸ ';
+  opacity: 0.5;
+}
+
+.terminal-screen-wrap {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  border-radius: 6px;
+  padding: 3px;
+  background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 232, 90, 0.12),
+    inset 0 2px 24px rgba(0, 0, 0, 0.85),
+    0 0 0 1px #000,
+    0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+/* Corner tick marks */
+.terminal-screen-wrap::before,
+.terminal-screen-wrap::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: rgba(0, 232, 90, 0.2);
+  border-style: solid;
+  pointer-events: none;
+  z-index: 12;
+}
+
+.terminal-screen-wrap::before {
+  top: 8px;
+  left: 8px;
+  border-width: 1px 0 0 1px;
+}
+
+.terminal-screen-wrap::after {
+  bottom: 8px;
+  right: 8px;
+  border-width: 0 1px 1px 0;
+}
+
+.terminal-screen {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #000;
+}
+
+.terminal-screen canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.screen-trail-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  mix-blend-mode: screen;
+}
+
+/* CRT scanlines + vignette */
+.terminal-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 11;
+  border-radius: 4px;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.07) 2px,
+      rgba(0, 0, 0, 0.07) 4px
+    ),
+    radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+.terminal-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(4px, 1vw, 8px);
+  flex-shrink: 0;
+}
+
+.terminal-hint {
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+  font-size: clamp(0.6rem, 1.6vw, 0.75rem);
+  letter-spacing: 0.2em;
+  color: rgba(0, 184, 70, 0.4);
+  user-select: none;
+  transition: opacity 1.2s ease;
+}
+
+.terminal-hint.hidden {
+  opacity: 0;
+}
+
+.terminal-ticks {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.screw {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #333 0%, #111 70%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.tick-mark {
+  width: 12px;
+  height: 1px;
+  background: rgba(0, 232, 90, 0.15);
+}
+
+@media (max-width: 480px) {
+  .terminal-status {
+    display: none;
+  }
+}
