@@ -11,15 +11,15 @@ export interface SceneBundle {
 export function createScene(container: HTMLElement): SceneBundle {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(VOID)
-  scene.fog = new THREE.Fog(FOG, 25, 95)
+  scene.fog = new THREE.Fog(FOG, 40, 180)
 
   const camera = new THREE.PerspectiveCamera(
-    55,
+    50,
     container.clientWidth / container.clientHeight,
     0.1,
-    200,
+    400,
   )
-  camera.position.set(0, 3, 10)
+  camera.position.set(0, 4, 12)
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -58,20 +58,31 @@ export function createScene(container: HTMLElement): SceneBundle {
   return { scene, camera, renderer, dispose }
 }
 
+/** Stable chase camera — yaw-based, minimal roll coupling */
 export function updateCameraFollow(
   camera: THREE.PerspectiveCamera,
   planePos: THREE.Vector3,
-  planeQuat: THREE.Quaternion,
+  heading: number,
+  pitch: number,
   dt: number,
 ) {
-  const offset = new THREE.Vector3(0, 2.2, 7)
-  offset.applyQuaternion(planeQuat)
-  const targetPos = planePos.clone().add(offset)
+  const dist = 9
+  const height = 3.2
+  const fx = Math.sin(heading)
+  const fz = -Math.cos(heading)
 
-  camera.position.lerp(targetPos, 1 - Math.pow(0.001, dt))
+  const targetPos = new THREE.Vector3(
+    planePos.x - fx * dist,
+    planePos.y + height - pitch * 1.5,
+    planePos.z - fz * dist,
+  )
 
-  const lookAhead = new THREE.Vector3(0, 0, -6)
-  lookAhead.applyQuaternion(planeQuat)
-  const lookTarget = planePos.clone().add(lookAhead)
-  camera.lookAt(lookTarget)
+  camera.position.lerp(targetPos, 1 - Math.pow(0.0008, dt))
+
+  const lookAt = new THREE.Vector3(
+    planePos.x + fx * 12,
+    planePos.y + pitch * 2,
+    planePos.z + fz * 12,
+  )
+  camera.lookAt(lookAt)
 }

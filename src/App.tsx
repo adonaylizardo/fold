@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { createScene, updateCameraFollow } from './scene/createScene'
-import { createEnvironment, wrapWorldPosition } from './scene/environment'
+import { createEnvironment } from './scene/environment'
 import { createBreezeMark, pointerToBreezeTarget } from './scene/breezeMark'
 import { createPlane, getWorldWingtips } from './plane/createPlane'
 import { WingtipTrails } from './plane/trails'
+import { ScreenTrailOverlay, projectToScreen } from './plane/screenTrail'
 import { createInputManager } from './input/InputManager'
 import { createWaveVisual, updateWaveVisuals, disposeAllWaveVisuals, type WaveVisual } from './input/waveVisuals'
 import {
@@ -30,6 +31,7 @@ export default function App() {
 
     const sim = new Simulation()
     const trails = new WingtipTrails(scene)
+    const screenTrail = new ScreenTrailOverlay(container)
     const input = createInputManager(renderer.domElement, camera, () => sim.position)
 
     const breezeWaves: BreezeWave[] = []
@@ -78,10 +80,6 @@ export default function App() {
       plane.updateRoll(dt)
       plane.group.updateMatrixWorld(true)
 
-      const wrapDelta = wrapWorldPosition(sim.position)
-      if (wrapDelta) trails.shift(wrapDelta)
-      plane.group.position.copy(sim.position)
-
       const breezeTarget = pointerToBreezeTarget(
         input.pointer.normalizedX,
         input.pointer.normalizedY,
@@ -93,7 +91,15 @@ export default function App() {
       const [leftTip, rightTip] = getWorldWingtips(plane.group, plane.leftTip, plane.rightTip)
       trails.update(leftTip, rightTip)
 
-      updateCameraFollow(camera, sim.position, sim.quaternion, dt)
+      const w = container.clientWidth
+      const h = container.clientHeight
+      const leftScreen = projectToScreen(leftTip, camera, w, h)
+      const rightScreen = projectToScreen(rightTip, camera, w, h)
+      if (leftScreen && rightScreen) {
+        screenTrail.update(leftScreen, rightScreen)
+      }
+
+      updateCameraFollow(camera, sim.position, sim.getHeading(), sim.pitchAngle, dt)
       env.update(dt, sim.position, sim.velocity)
 
       const aliveVis = updateWaveVisuals(waveVisuals, breezeWaves, dt)
@@ -108,6 +114,7 @@ export default function App() {
     return () => {
       cancelAnimationFrame(animId)
       trails.dispose()
+      screenTrail.dispose()
       breezeMark.dispose()
       disposeAllWaveVisuals(waveVisuals)
       plane.dispose()

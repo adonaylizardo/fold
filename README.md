@@ -2,9 +2,11 @@
 
 **A paper plane. A breeze. A page.**
 
-An endless paper-plane gliding toy — meditative, immediate, no score, no crash, no fail. Phosphor green on deep black.
+An endless paper-plane gliding toy — meditative, immediate, no score, no crash, no fail. Phosphor green on deep black, framed like a retro CRT terminal.
 
-## Quick start
+**Live demo:** https://adonaylizardo.github.io/fold/
+
+## Quick start (local)
 
 ```bash
 npm install
@@ -20,39 +22,59 @@ npm run build
 npm run preview
 ```
 
-Output goes to `dist/` — deploy as a static site anywhere.
+Output goes to `dist/` — GitHub Pages deploys automatically on push to `main`.
 
-## How to play (30 seconds)
+## How to fly
 
-1. **Glide forever** — the plane drifts on ambient wind even with no input. You’re always traveling through the void.
-2. **Move your pointer** (mouse or finger) — the plane follows like a breeze is guiding it. It banks when you turn and levels when you hold still.
-3. **Click or tap** — drops an expanding breeze **wave**: a green reticle + thin ring that grows outward (~1–2s). The plane keeps its path until the wave front reaches it, then lurches **away from the click** (radial shove). Nearby clicks hit fast and hard; far clicks take longer and push weaker. Wind streaks on the ring help it read as breeze.
-4. **Keyboard (desktop):**
-   - **W** / **↑** — climb
-   - **S** / **↓** — dive
-   - **A** / **←** — bank left
-   - **D** / **→** — bank right
-   - **Space** — barrel roll (short cooldown)
-   Hold keys to steer; they combine with pointer breeze.
-5. **Tap the plane** (touch) — barrel roll, same as Space.
+### The basics
 
-First gesture unlocks a quiet whoosh bed plus soft sounds on wave hits, turns, and rolls. No music, no harsh beeps.
+You always fly **forward**. Gravity pulls you down — without lift you **descend**. Work to stay aloft with pointer and keyboard. There is no game over; sink low and climb back. Ambient wind exists but is **not** enough to hover forever.
+
+### Pointer (mouse / touch)
+
+Move your pointer — the plane **turns and tilts** toward the breeze. Pointer up = climb tendency; pointer sideways = bank and turn.
+
+### Click / tap — breeze wave
+
+Drops an expanding green **wave** (reticle + ring + streaks). The plane keeps its path until the wave front reaches it, then lurches **away from the click**. Nearby = fast and strong; far = delayed and weaker.
+
+### Keyboard
+
+| Key | Action |
+|-----|--------|
+| **W** / **↑** | Climb (pitch up, gain lift) |
+| **S** / **↓** | Dive |
+| **A** / **←** | Turn / bank left |
+| **D** / **→** | Turn / bank right |
+| **Space** | Barrel roll (short cooldown) |
+
+Hold keys to steer; they combine with pointer breeze. On touch, **tap the plane** for barrel roll.
+
+### Gravity & lift
+
+- Gravity constantly pulls the plane down.
+- **Forward speed + nose-up pitch** generate lift — use **W** or pointer-up to climb.
+- Release climb input and you gradually lose altitude. No crash state — just glide back up.
+
+### Sound
+
+First gesture unlocks a quiet whoosh bed plus soft cues on wave hits, turns, and rolls. No music, no harsh beeps.
 
 ## Look
 
-- **Retro terminal frame** — the 3D view sits inside a phosphor-green CRT/console bezel with scanlines and quiet status ticks.
-- **Persistent flight ribbons** — dual green wingtip trails stay visible as a long trajectory behind you (they don’t wipe away).
-- **Living void** — dense twinkling starfield, passing wireframe planets, streaming vector dust.
+- **Retro terminal bezel** — CRT frame, scanlines, phosphor-green chrome
+- **Persistent flight ribbons** — dual wingtip trails (3D + screen overlay) that never wipe during a session
+- **Living starfield** — twinkling stars, parallax, streaming dust — no planets
 
 ## Feel
 
-Like being a paper plane traveling in the wind — enough breeze to keep moving forever, with clicks as ripples that perturb your glide.
+Real paper-plane flight: forward momentum, gravity, and breeze. Clicks send ripples through the wind; you work to stay up.
 
 ## v1.1 ideas
 
 - **Soundscape** — layered phosphor hum, soft terminal static, subtle doppler on rolls
-- **Fold skins** — swap wireframe crease patterns and green intensity presets (dart, swallowtail, letter fold)
-- **Share a 10s loop** — record a short flight clip as a GIF or link to send someone a moment of calm
+- **Fold skins** — swap wireframe crease patterns and green intensity presets
+- **Share a 10s loop** — record a short flight clip as a GIF or link
 
 ---
 
