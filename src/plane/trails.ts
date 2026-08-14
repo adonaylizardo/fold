@@ -1,18 +1,17 @@
 import * as THREE from 'three'
 import { phosphorRgb } from '../theme/colors'
 
-/** Long session ribbon — ring buffer, no wrap, no fog fade */
-const MAX_POINTS = 5000
+/** ~15s of wingtip ribbon, then points fade out and drop */
+const TRAIL_LIFETIME_S = 15
+const MAX_POINTS = 2000
 const MIN_BRIGHTNESS = 0.48
 const SAMPLE_EVERY = 1
 
+type TrailPoint = { pos: THREE.Vector3; t: number }
+
 export class WingtipTrails {
-  private leftBuf: THREE.Vector3[] = []
-  private rightBuf: THREE.Vector3[] = []
-  private leftHead = 0
-  private leftCount = 0
-  private rightHead = 0
-  private rightCount = 0
+  private leftPoints: TrailPoint[] = []
+  private rightPoints: TrailPoint[] = []
   private leftLine: THREE.Line
   private rightLine: THREE.Line
   private leftGeo: THREE.BufferGeometry
@@ -24,9 +23,6 @@ export class WingtipTrails {
   private tick = 0
 
   constructor(scene: THREE.Scene) {
-    this.leftBuf = Array.from({ length: MAX_POINTS }, () => new THREE.Vector3())
-    this.rightBuf = Array.from({ length: MAX_POINTS }, () => new THREE.Vector3())
-
     this.leftGeo = new THREE.BufferGeometry()
     this.rightGeo = new THREE.BufferGeometry()
 
@@ -59,54 +55,55 @@ export class WingtipTrails {
     this.tick++
     if (this.tick % SAMPLE_EVERY !== 0) return
 
-    this.pushPoint(this.leftBuf, 'left', leftTip)
-    this.pushPoint(this.rightBuf, 'right', rightTip)
-    this.rebuildLine(this.leftGeo, this.leftBuf, this.leftHead, this.leftCount, this.leftPosAttr, this.leftColAttr)
-    this.rebuildLine(this.rightGeo, this.rightBuf, this.rightHead, this.rightCount, this.rightPosAttr, this.rightColAttr)
+    const now = performance.now() * 0.001
+    this.pushPoint(this.leftPoints, leftTip, now)
+    this.pushPoint(this.rightPoints, rightTip, now)
+    this.rebuildLine(this.leftGeo, this.leftPoints, now, this.leftPosAttr, this.leftColAttr)
+    this.rebuildLine(this.rightGeo, this.rightPoints, now, this.rightPosAttr, this.rightColAttr)
   }
 
-  private pushPoint(buf: THREE.Vector3[], side: 'left' | 'right', p: THREE.Vector3) {
-    const head = side === 'left' ? this.leftHead : this.rightHead
-    const count = side === 'left' ? this.leftCount : this.rightCount
-    buf[head].copy(p)
-    const newHead = (head + 1) % MAX_POINTS
-    const newCount = Math.min(count + 1, MAX_POINTS)
-    if (side === 'left') {
-      this.leftHead = newHead
-      this.leftCount = newCount
-    } else {
-      this.rightHead = newHead
-      this.rightCount = newCount
+  private pushPoint(points: TrailPoint[], p: THREE.Vector3, now: number) {
+    points.push({ pos: p.clone(), t: now })
+    while (points.length > 0 && now - points[0].t > TRAIL_LIFETIME_S) {
+      points.shift()
+    }
+    while (points.length > MAX_POINTS) {
+      points.shift()
     }
   }
 
-  /** Oldest → newest order for Line geometry */
+  /** Oldest → newest order for Line geometry; fade by age within lifetime */
   private rebuildLine(
     geo: THREE.BufferGeometry,
-    buf: THREE.Vector3[],
-    head: number,
-    count: number,
+    points: TrailPoint[],
+    now: number,
     posAttr: THREE.BufferAttribute,
     colAttr: THREE.BufferAttribute,
   ) {
-    if (count < 2) return
+    const count = points.length
+    if (count < 2) {
+      geo.setDrawRange(0, 0)
+      return
+    }
+
     const pos = posAttr.array as Float32Array
     const col = colAttr.array as Float32Array
-    const start = (head - count + MAX_POINTS) % MAX_POINTS
 
     for (let i = 0; i < count; i++) {
-      const idx = (start + i) % MAX_POINTS
-      const p = buf[idx]
+      const { pos: p, t } = points[i]
       pos[i * 3] = p.x
       pos[i * 3 + 1] = p.y
       pos[i * 3 + 2] = p.z
-      const age = i / Math.max(count - 1, 1)
-      const t = MIN_BRIGHTNESS + (1 - age) * (1 - MIN_BRIGHTNESS)
-      const [r, g, b] = phosphorRgb(t)
+
+      const age = now - t
+      const fade = Math.max(0, 1 - age / TRAIL_LIFETIME_S)
+      const brightness = MIN_BRIGHTNESS + fade * (1 - MIN_BRIGHTNESS)
+      const [r, g, b] = phosphorRgb(brightness)
       col[i * 3] = r
       col[i * 3 + 1] = g
       col[i * 3 + 2] = b
     }
+
     posAttr.needsUpdate = true
     colAttr.needsUpdate = true
     geo.setDrawRange(0, count)

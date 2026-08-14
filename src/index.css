@@ -113,14 +113,6 @@ body,
   height: 100%;
 }
 
-.screen-trail-overlay {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 5;
-  mix-blend-mode: screen;
-}
-
 /* CRT scanlines + vignette */
 .terminal-screen::after {
   content: '';
